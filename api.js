@@ -155,48 +155,43 @@ T.prototype._formatResult = function(result, format) {
 var Util = {};
 
 Util.createSignBase = function(_oauth, req, post) {
-        var urlUtil = require('url'),
-            oauth = _oauth;
-            method = req.method,
-            proto = 'http://',
-            host = req.headers.host ? req.headers.host : T.DOMAIN,
-            urlObject = urlUtil.parse(req.url, true),
-            url = Util.encodeData(proto + host  + urlObject.pathname);
-        delete oauth.oauth_signature;
-        if(method == "GET" && urlObject.query) {
-            //sys.log("D:"+sys.inspect(urlObject.query));
-            oauth = Base.mix(oauth, urlObject.query);
-        } else {
-            //sys.log("Method:"+sys.inspect(this.POST));
-            oauth = Base.mix(oauth, post);
-        }
-        return [ method, url, Util.encodeData( Util.normaliseRequestParams(oauth) )].join('&');
+    var urlUtil = require('url'),
+        oauth = _oauth;
+        method = req.method,
+        proto = 'http://',
+        host = req.headers.host ? req.headers.host : T.DOMAIN,
+        urlObject = urlUtil.parse(req.url, true),
+        url = Util.encodeData(proto + host  + urlObject.pathname);
+    
+    delete oauth.oauth_signature;
+    if(method == "GET" && urlObject.query) {
+        oauth = Base.mix(oauth, urlObject.query);
+    } else {
+        oauth = Base.mix(oauth, post);
+    }
+    return [ method, url, Util.encodeData( Util.normaliseRequestParams(oauth) )].join('&');
 };
 
 Util.createSignature= function(method, signatureBase, tokenSecret, consumerSecret) {
-       if( tokenSecret === undefined ) var tokenSecret= "";
-       else tokenSecret= Util.encodeData( tokenSecret );
-       // consumerSecret is already encoded
-       var key= consumerSecret + "&" + tokenSecret;
+    if( tokenSecret === undefined ) var tokenSecret= "";
+    else tokenSecret= Util.encodeData( tokenSecret );
+    // consumerSecret is already encoded
+    var key= consumerSecret + "&" + tokenSecret,
+        hash= ""
+    if( method == "PLAINTEXT" ) {
+        hash= Util.encodeData(key);
+    } else {
+        var sha1 = require('node-oauth/lib/sha1');
+        hash= sha1.HMACSHA1(key, signatureBase);
+    }
     
-       var hash= ""
-       if( method == "PLAINTEXT" ) {
-         hash= Util.encodeData(key);
-       }
-       else {
-         var sha1 = require('node-oauth/lib/sha1');
-         //var sys = require('util');
-         //sys.log(sys.inspect( signatureBase ));
-         hash= sha1.HMACSHA1(key, signatureBase);
-       }
-    
-       return hash;
+    return hash;
 };
 
 Util.encodeData= function(toEncode){
-	if( !toEncode || toEncode == "" ) return ""
+	if( !toEncode || toEncode == "" ) return "";
 	else {
-		var result= encodeURIComponent(toEncode);
+        var result= encodeURIComponent(toEncode);
 		// Fix the mismatch between OAuth's  RFC3986's and Javascript's beliefs in what is right and wrong ;)
 		return result.replace(/\!/g, "%21")
 		          .replace(/\'/g, "%27")
@@ -205,34 +200,34 @@ Util.encodeData= function(toEncode){
 		          .replace(/\*/g, "%2A");
 		}
 };
- 
+
 // Takes a literal in, then returns a sorted array
-Util.sortRequestParams= function(argumentsHash) {
-   var argument_pairs= [];
-   for(var key in argumentsHash ) {
-       argument_pairs[argument_pairs.length]= [key, argumentsHash[key]];
-   }
-   // Sort by name, then value.
-   argument_pairs.sort(function(a,b) {
-       if ( a[0]== b[0] )  {
-         return a[1] < b[1] ? -1 : 1;
-       }
-       else return a[0] < b[0] ? -1 : 1;
-   });
- 
-   return argument_pairs;
+Util.sortRequestParams = function(argumentsHash) {
+    var argument_pairs = [],
+        key;
+    for(key in argumentsHash ) {
+        argument_pairs[argument_pairs.length]= [key, argumentsHash[key]];
+    }
+    // Sort by name, then value.
+    argument_pairs.sort(function(a,b) {
+        if ( a[0]== b[0] )  {
+            return a[1] < b[1] ? -1 : 1;
+        }
+        else return a[0] < b[0] ? -1 : 1;
+    });
+
+    return argument_pairs;
 };
- 
-Util.normaliseRequestParams= function(arguments) {
-   var argument_pairs= Util.sortRequestParams( arguments );
-   var args= "";
-   for(var i=0;i<argument_pairs.length;i++) {
-       args+= Util.encodeData( argument_pairs[i][0] );
-       args+= "="
-       args+= Util.encodeData( argument_pairs[i][1] );
-       if( i < argument_pairs.length-1 ) args+= "&";
+
+Util.normaliseRequestParams = function(arguments) {
+    var argument_pairs= Util.sortRequestParams( arguments ),
+        args= [],
+        length = argument_pairs.length,
+        i;
+   for(i=0;i<length;i++) {
+       args[i] =  Util.encodeData( argument_pairs[i][0] ) + "=" + Util.encodeData( argument_pairs[i][1] );
    }
-   return args;
+   return args.join('&');
 };
 
 export = T;
