@@ -12,8 +12,7 @@ Base.extend( ApiKey, DBObject);
 ApiKey.COLLECTION = "apikeys";
 
 ApiKey.prototype.get = function( customer_key, callback, scope) {
-    var mongoObjects = this._db.bson_serializer,
-        id = new mongoObjects.ObjectID(customer_key);
+    var id = DBObject.toObjectID(customer_key, this._db);
 	    
 	this.load( { _id: id }, {}, {}, function(data) {
 		if(!scope)

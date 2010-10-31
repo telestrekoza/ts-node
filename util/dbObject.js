@@ -8,6 +8,17 @@ DBObject = function(db, col) {
 
 DBObject.COLLECTION="";
 
+/*
+ * static memebers
+ */
+DBObject.toObjectID = function( id, db ) {
+    var mongoObjects = db.bson_serializer;
+    return new mongoObjects.ObjectID(id);
+};
+
+/*
+ * public methods
+ */
 DBObject.prototype.load = function( query, filter, options, callback, params, scope ) {
 	var self = this,
 		db = this._db,
