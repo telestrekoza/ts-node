@@ -4,11 +4,12 @@ var DB = Base.loadFile('../util/db.js').DB,
 	DBObject = Base.loadFile('../util/dbObject.js').DBObject;
 
 var ApiKey = function(db) {
-    ApiKey.superclass.constructor.call(this, db, ApiKey.COLLECTION);
+    ApiKey.superclass.constructor.call(this, db);
 };
 
 Base.extend( ApiKey, DBObject);
 
+ApiKey.NAME = "ApiKey";
 ApiKey.COLLECTION = "apikeys";
 
 ApiKey.prototype.get = function( customer_key, callback, scope) {
@@ -35,10 +36,6 @@ User.prototype.create = function(user) {
 	return [user];
 };
 */
-
-ApiKey.prototype.toString = function() {
-    return "ApiKey: " + ApiKey.superclass.toString.call(this);
-};
 
 exports.DBO = ApiKey;
 

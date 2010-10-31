@@ -1,8 +1,8 @@
 (function() {
 
-DBObject = function(db, col) {
+DBObject = function(db) {
 	this._db = db;
-	this._collectionID = col ? col : DBObject.COLLECTION;
+	this._collectionID = this.constructor.COLLECTION ? this.constructor.COLLECTION : DBObject.COLLECTION;
 	this._collection = null;
 };
 
@@ -103,7 +103,8 @@ DBObject.prototype.save = function(obj, callback, scope) {
 };
 
 DBObject.prototype.toString = function() {
-	return "DBObject "+this._collectionID;
+    var name = this.constructor.NAME ? this.constructor.NAME : this.constructor.COLLECTION;
+	return "DBObject::" + name;
 };
 
 exports.DBObject = DBObject;
