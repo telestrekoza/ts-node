@@ -133,6 +133,8 @@ T.prototype._checkAuth = function(oauthString, callback, scope) {
 		if(sign_org != sign) {
 		   sys.log(sys.inspect(signBase));
 		   sys.puts(sys.inspect(sign_org)+"\n"+sys.inspect(sign));
+		} else {
+		    oauth = Base.mix(oauth, key);
 		}
 		callback.call(scope ? scope : self, (sign_org == sign ) ? oauth : null);
 	});

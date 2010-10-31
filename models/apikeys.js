@@ -13,29 +13,22 @@ ApiKey.NAME = "ApiKey";
 ApiKey.COLLECTION = "apikeys";
 
 ApiKey.prototype.get = function( customer_key, callback, scope) {
-    var id = DBObject.toObjectID(customer_key, this._db);
+    var db = this._db,
+        id = DBObject.toObjectID(customer_key, db);
 	    
 	this.load( { _id: id }, {}, {}, function(data) {
 		if(!scope)
 			scope = this;
-		callback.apply(scope, data);
+        if(data && data.length == 1) {
+            db.dereference(data[0].owner, function( err, owner) {
+                data[0].owner = owner;
+                callback.apply(scope, data);
+            });
+        } else
+            callback.apply(scope, data);
 	}
 	, this);
 };
-
-/*
-User.prototype.save = function(data, callback, scope) {
-    User.superclass.save.apply(this, arguments);
-};
-
-User.prototype.create = function(user) {
-	if(!user || !user.loginName) {
-		return [{}];
-	}
-	User.superclass.create.call(this, user);
-	return [user];
-};
-*/
 
 exports.DBO = ApiKey;
 
