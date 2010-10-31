@@ -8,6 +8,7 @@ var sys = require('util');
 var T = function() {
     T.superclass.constructor.apply(this, arguments);
     this.controller  = null;
+    
 };
 
 T.BASE_API_PATH = "./api-latest/";
@@ -21,15 +22,26 @@ T.DEBUG = true;
 Base.extend( T, Base.HtmlController );
 
 T.prototype.doHeaders = function() {
-    var controllerType,
-		headers = this.req.headers,
-		auth = (headers || headers.authorization) ? headers.authorization : false;
+    var DB = Base.loadFile('./util/db.js').DB,
+	    db = new DB(null, null, 'prod'),
+	    callback = {
+	    	success: this._hasDB,
+			failure: this._noDB,
+			scope: this
+	    };
+    db.open(callback);
+};
+
+T.prototype._hasDB = function( err, db ) {
+    var headers = this.req.headers,
+    	auth = (headers || headers.authorization) ? headers.authorization : false;
+	this.db = db;
 	this._checkAuth(auth, this.getAuth, this);
 };
 
 T.prototype.getAuth = function(oauth) {
     //TODO:check too fast usage
-	if(oauth) {
+    if(oauth) {
 	    this._auth = oauth;
 	    this._parseQuery( this.query );
 		controllerType = (this._format == T.FORMAT_JSON) ? Base.JsonController : Base.HtmlController;
@@ -103,30 +115,26 @@ T.prototype._parseAuthentification = function( data ) {
 
 T.prototype._checkAuth = function(oauthString, callback, scope) {
 	//TODO: use something like cookie, or sessions to cache this step
-	//make async
-	var self = this;
-	process.nextTick( function() {
-	   var oauth = self._parseAuthentification.call(self, oauthString),
-	       sign_org = oauth.oauth_signature,
-	       method = oauth.oauth_signature_method;
-	   /*
-	   var OAuth = require('node-oauth').OAuth;
-	   var oa = new OAuth(
-	          "http://node.kliopa.net/node/oauth/service.js/request_token"
-            , "http://node.kliopa.net/node/oauth/service.js/access_token"
-            , "WZBmfGH0u9cExrDB5iYow",  "9XpDfArpTBTONhraJoIF2zNN9Eg11vIwzLDlKzans"
-            , "1.0", "http://node.kliopa.net/node/oauth/service.js/trace", 'HMAC-SHA1'//'PLAINTEXT'//"HMAC-SHA1"
-	       );
-	   */
-	   var sys= require('util');
-	   //sys.log(sys.inspect(oauth));
-	   var signBase = self._createSignBase.call(self, oauth),
-	       sign = self._createSignature.call(self, method, signBase, 'ahuOyEgcJe4j5XkSA0ggx5YjO9XkOSOIwrItZ8jI', '9XpDfArpTBTONhraJoIF2zNN9Eg11vIwzLDlKzans');
-	   if(sign_org != sign) {
-	       sys.log(sys.inspect(signBase));
-	       sys.puts(sys.inspect(sign_org)+"\n"+sys.inspect(sign));
-	   }
-	   callback.call(scope ? scope : self, (sign_org == sign ) ? oauth : null);    
+	var self = this,
+        oauth = this._parseAuthentification(oauthString),
+        ApiKeys = Base.loadFile('./models/apikeys.js').DBO,
+        apiKey = new ApiKeys(this.db);
+	
+	apiKey.get( oauth.oauth_consumer_key, function( key ) {
+	    if(!key) {
+	        callback.call(scope ? scope : self, null);
+	    }
+	    
+		var sign_org = oauth.oauth_signature,
+		   method = oauth.oauth_signature_method;
+		
+		var signBase = Util.createSignBase(oauth, self.req, self.POST),
+            sign = Util.createSignature( method, signBase, key.access_token_secret, key.secret);
+		if(sign_org != sign) {
+		   sys.log(sys.inspect(signBase));
+		   sys.puts(sys.inspect(sign_org)+"\n"+sys.inspect(sign));
+		}
+		callback.call(scope ? scope : self, (sign_org == sign ) ? oauth : null);
 	});
 };
 
@@ -140,39 +148,40 @@ T.prototype._formatResult = function(result, format) {
 };
 
 /*
- util
+ util static class
+ copied from node-auth module
 */
 
-T.prototype._createSignBase = function(_oauth) {
-        var sys = require('util');
+var Util = {};
+
+Util.createSignBase = function(_oauth, req, post) {
         var urlUtil = require('url'),
-            req = this.req,
             oauth = _oauth;
             method = req.method,
             proto = 'http://',
             host = req.headers.host ? req.headers.host : T.DOMAIN,
             urlObject = urlUtil.parse(req.url, true),
-            url = this._encodeData(proto + host  + urlObject.pathname);
+            url = Util.encodeData(proto + host  + urlObject.pathname);
         delete oauth.oauth_signature;
         if(method == "GET" && urlObject.query) {
             //sys.log("D:"+sys.inspect(urlObject.query));
             oauth = Base.mix(oauth, urlObject.query);
         } else {
             //sys.log("Method:"+sys.inspect(this.POST));
-            oauth = Base.mix(oauth, this.POST);
+            oauth = Base.mix(oauth, post);
         }
-        return [ method, url, this._encodeData( this._normaliseRequestParams(oauth) )].join('&');
+        return [ method, url, Util.encodeData( Util.normaliseRequestParams(oauth) )].join('&');
 };
 
-T.prototype._createSignature= function(method, signatureBase, tokenSecret, consumerSecret) {
+Util.createSignature= function(method, signatureBase, tokenSecret, consumerSecret) {
        if( tokenSecret === undefined ) var tokenSecret= "";
-       else tokenSecret= this._encodeData( tokenSecret );
+       else tokenSecret= Util.encodeData( tokenSecret );
        // consumerSecret is already encoded
        var key= consumerSecret + "&" + tokenSecret;
     
        var hash= ""
        if( method == "PLAINTEXT" ) {
-         hash= this._encodeData(key);
+         hash= Util.encodeData(key);
        }
        else {
          var sha1 = require('node-oauth/lib/sha1');
@@ -184,7 +193,7 @@ T.prototype._createSignature= function(method, signatureBase, tokenSecret, consu
        return hash;
 };
 
-T.prototype._encodeData= function(toEncode){
+Util.encodeData= function(toEncode){
 	if( !toEncode || toEncode == "" ) return ""
 	else {
 		var result= encodeURIComponent(toEncode);
@@ -197,8 +206,8 @@ T.prototype._encodeData= function(toEncode){
 		}
 };
  
- // Takes a literal in, then returns a sorted array
-T.prototype._sortRequestParams= function(argumentsHash) {
+// Takes a literal in, then returns a sorted array
+Util.sortRequestParams= function(argumentsHash) {
    var argument_pairs= [];
    for(var key in argumentsHash ) {
        argument_pairs[argument_pairs.length]= [key, argumentsHash[key]];
@@ -214,13 +223,13 @@ T.prototype._sortRequestParams= function(argumentsHash) {
    return argument_pairs;
 };
  
-T.prototype._normaliseRequestParams= function(arguments) {
-   var argument_pairs= this._sortRequestParams( arguments );
+Util.normaliseRequestParams= function(arguments) {
+   var argument_pairs= Util.sortRequestParams( arguments );
    var args= "";
    for(var i=0;i<argument_pairs.length;i++) {
-       args+= this._encodeData( argument_pairs[i][0] );
+       args+= Util.encodeData( argument_pairs[i][0] );
        args+= "="
-       args+= this._encodeData( argument_pairs[i][1] );
+       args+= Util.encodeData( argument_pairs[i][1] );
        if( i < argument_pairs.length-1 ) args+= "&";
    }
    return args;
