@@ -1,7 +1,7 @@
 (function() {
 
 	
-DB = function(host, port, env) {
+var DB = function(host, port, env) {
 	this._host = host ? host : DB.HOST;
 	this._port = port ? port : null;
 	this._env = env ? env : DB.ENV;

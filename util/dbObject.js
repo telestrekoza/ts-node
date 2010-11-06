@@ -1,6 +1,6 @@
 (function() {
 
-DBObject = function(db) {
+var DBObject = function(db) {
 	this._db = db;
 	this._collectionID = this.constructor.COLLECTION ? this.constructor.COLLECTION : DBObject.COLLECTION;
 	this._collection = null;
